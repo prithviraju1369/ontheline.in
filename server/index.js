@@ -4,8 +4,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
 const logger = require('./utils/logger');
+const { connectToDatabase, ensureDbConnection, getConnectionStatus } = require('./utils/database');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -42,16 +42,33 @@ app.use('/api/', limiter);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Database connection
-// Note: useNewUrlParser and useUnifiedTopology are deprecated and no longer needed
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ondc_buyer_app')
-.then(() => logger.info('MongoDB connected successfully'))
-.catch(err => logger.error('MongoDB connection error:', err));
+// Database connection - handled per request in serverless
+// Connection is established lazily and cached for warm starts
 
-// Health check endpoint
+// Health check endpoint (doesn't require DB)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const dbStatus = getConnectionStatus();
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: dbStatus.state,
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
+
+// Database connection check endpoint
+app.get('/api/health/db', ensureDbConnection, (req, res) => {
+  const dbStatus = getConnectionStatus();
+  res.json({
+    status: 'ok',
+    database: dbStatus,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Ensure database connection for all API routes
+// This middleware connects to DB before processing requests
+app.use('/api/', ensureDbConnection);
 
 // API Routes
 app.use('/api/auth', authRoutes);
