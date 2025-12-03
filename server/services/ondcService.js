@@ -73,6 +73,7 @@ class ONDCService {
 
       // Parse the private key to ensure it's in correct format
       let privateKey;
+      let keyType;
       try {
         // Handle both direct PEM and escaped newline formats
         const keyString = this.privateKey.replace(/\\n/g, '\n');
@@ -80,32 +81,49 @@ class ONDCService {
           key: keyString,
           format: 'pem'
         });
-        logger.info('Private key parsed successfully');
+        
+        // Detect key type
+        keyType = privateKey.asymmetricKeyType;
+        logger.info('Private key parsed successfully', { keyType });
       } catch (keyError) {
         logger.error('Failed to parse private key', { 
           error: keyError.message,
           keyStart: this.privateKey.substring(0, 50) + '...'
         });
-        throw new Error('Invalid ONDC_SIGNING_PRIVATE_KEY format. Must be valid PEM format.');
+        throw new Error('Invalid ONDC_SIGNING_PRIVATE_KEY format. Must be valid PEM format (ed25519 or RSA).');
       }
 
       let signature;
-      let algorithm = 'RSA-SHA256';
+      let algorithm;
 
       try {
-        // Sign using the parsed key
-        const sign = crypto.createSign('SHA256');
-        sign.update(signingString);
-        sign.end();
-        signature = sign.sign(privateKey, 'base64');
-        
-        logger.info('Signing successful', { 
-          algorithm,
-          signatureLength: signature.length 
-        });
+        if (keyType === 'ed25519') {
+          // ed25519 signing (ONDC standard)
+          algorithm = 'ed25519';
+          signature = crypto.sign(null, Buffer.from(signingString), privateKey).toString('base64');
+          
+          logger.info('ed25519 signing successful', { 
+            algorithm,
+            signatureLength: signature.length 
+          });
+        } else if (keyType === 'rsa') {
+          // RSA signing (fallback)
+          algorithm = 'RSA-SHA256';
+          const sign = crypto.createSign('SHA256');
+          sign.update(signingString);
+          sign.end();
+          signature = sign.sign(privateKey, 'base64');
+          
+          logger.info('RSA signing successful', { 
+            algorithm,
+            signatureLength: signature.length 
+          });
+        } else {
+          throw new Error(`Unsupported key type: ${keyType}. ONDC requires ed25519 keys.`);
+        }
       } catch (signError) {
-        logger.error('Signing failed', { error: signError.message });
-        throw new Error(`Unable to sign request: ${signError.message}`);
+        logger.error('Signing failed', { error: signError.message, keyType });
+        throw new Error(`Unable to sign request with ${keyType || 'unknown'} key: ${signError.message}`);
       }
       
       return {
