@@ -1,0 +1,10 @@
+node_modules
+.env
+.env.local
+*.log
+.DS_Store
+logs/
+private_key.pem
+public_key.pem
+generate-keys.js
+
