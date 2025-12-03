@@ -1,22 +1,20 @@
 {
-  "version": 2,
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "client/dist",
-  "builds": [
-    {
-      "src": "server/index.js",
-      "use": "@vercel/node"
-    }
-  ],
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/server/index.js"
+      "source": "/api/(.*)",
+      "destination": "/api"
     },
     {
-      "source": "/((?!api).*)",
+      "source": "/health",
+      "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
 }
+
 
