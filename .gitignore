@@ -1,0 +1,20 @@
+node_modules/
+.env
+.DS_Store
+dist/
+build/
+logs/
+*.log
+.vscode/
+.idea/
+coverage/
+*.local
+client/dist/
+client/node_modules/
+
+# ONDC Keys - NEVER commit these!
+private_key.pem
+public_key.pem
+*.pem
+generate-keys.js
+
