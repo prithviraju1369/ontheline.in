@@ -9,7 +9,8 @@ const orderSchema = new mongoose.Schema({
   orderId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    index: true  // Explicitly mark - removed duplicate below
   },
   transactionId: {
     type: String,
@@ -132,8 +133,10 @@ const orderSchema = new mongoose.Schema({
   }
 });
 
+// Compound index for user order history queries (most common query pattern)
 orderSchema.index({ userId: 1, createdAt: -1 });
-orderSchema.index({ orderId: 1 });
+
+// Index for transaction lookups (removed orderId - already indexed via unique: true above)
 orderSchema.index({ transactionId: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);
