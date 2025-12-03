@@ -65,6 +65,21 @@ class ONDCService {
     return `(created): ${Math.floor(Date.now() / 1000)}\n(expires): ${Math.floor(Date.now() / 1000 + 3600)}\ndigest: BLAKE-512=${digest}`;
   }
 
+  // Create Authorization header for ONDC requests
+  createAuthorizationHeader(requestBody) {
+    try {
+      const authData = this.generateAuthSignature(requestBody);
+      
+      // Format: Signature keyId="...",algorithm="...",created="...",expires="...",headers="(created) (expires) digest",signature="..."
+      const authHeader = `Signature keyId="${authData.keyId}",algorithm="${authData.algorithm}",created="${authData.created}",expires="${authData.expires}",headers="(created) (expires) digest",signature="${authData.signature}"`;
+      
+      return authHeader;
+    } catch (error) {
+      logger.error('Error creating authorization header:', error);
+      throw new Error('Failed to create authentication header for ONDC request');
+    }
+  }
+
   // Search for products
   async search(searchParams) {
     try {
@@ -114,9 +129,13 @@ class ONDCService {
 
       logger.info('Sending search request to ONDC gateway', { transactionId, messageId });
       
+      // Generate authentication signature
+      const authHeader = this.createAuthorizationHeader(requestBody);
+      
       const response = await axios.post(`${this.gatewayUrl}/search`, requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -171,9 +190,12 @@ class ONDCService {
 
       logger.info('Sending select request', { transactionId: selectParams.transactionId });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(selectParams.bppUri + '/select', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -224,9 +246,12 @@ class ONDCService {
 
       logger.info('Sending init request', { transactionId: initParams.transactionId });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(initParams.bppUri + '/init', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -275,9 +300,12 @@ class ONDCService {
         orderId: confirmParams.orderId 
       });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(confirmParams.bppUri + '/confirm', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -308,9 +336,12 @@ class ONDCService {
 
       logger.info('Sending status request', { orderId: statusParams.orderId });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(statusParams.bppUri + '/status', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -341,9 +372,12 @@ class ONDCService {
 
       logger.info('Sending track request', { orderId: trackParams.orderId });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(trackParams.bppUri + '/track', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -378,9 +412,12 @@ class ONDCService {
 
       logger.info('Sending cancel request', { orderId: cancelParams.orderId });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(cancelParams.bppUri + '/cancel', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
@@ -411,9 +448,12 @@ class ONDCService {
 
       logger.info('Sending support request', { orderId: supportParams.orderId });
 
+      const authHeader = this.createAuthorizationHeader(requestBody);
+
       const response = await axios.post(supportParams.bppUri + '/support', requestBody, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
         }
       });
 
