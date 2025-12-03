@@ -37,22 +37,73 @@ class ONDCService {
     return context;
   }
 
+  // Detect key algorithm from private key
+  detectKeyAlgorithm() {
+    if (!this.privateKey) {
+      throw new Error('ONDC_SIGNING_PRIVATE_KEY not configured');
+    }
+    
+    // Check if it's ed25519 or RSA
+    if (this.privateKey.includes('BEGIN PRIVATE KEY') || this.privateKey.includes('BEGIN EC PRIVATE KEY')) {
+      // Could be ed25519 or RSA - try to detect from key content
+      // ed25519 keys are typically shorter
+      return this.privateKey.length < 200 ? 'ed25519' : 'RSA-SHA256';
+    }
+    
+    // Default to RSA-SHA256 for traditional keys
+    return 'RSA-SHA256';
+  }
+
   // Generate authentication signature
   generateAuthSignature(requestBody) {
     try {
-      const signingString = this.createSigningString(requestBody);
-      const sign = crypto.createSign('SHA256');
-      sign.update(signingString);
-      sign.end();
+      if (!this.privateKey) {
+        throw new Error('ONDC_SIGNING_PRIVATE_KEY not set in environment variables');
+      }
+
+      const created = Math.floor(Date.now() / 1000);
+      const expires = created + 3600; // 1 hour
       
-      const signature = sign.sign(this.privateKey, 'base64');
+      // Create signing string
+      const digest = crypto.createHash('BLAKE2b512').update(JSON.stringify(requestBody)).digest('base64');
+      const signingString = `(created): ${created}\n(expires): ${expires}\ndigest: BLAKE-512=${digest}`;
+      
+      logger.info('Signing string created', { created, expires });
+
+      let signature;
+      let algorithm;
+
+      try {
+        // Try RSA-SHA256 first (most common for ONDC)
+        const sign = crypto.createSign('SHA256');
+        sign.update(signingString);
+        sign.end();
+        signature = sign.sign(this.privateKey, 'base64');
+        algorithm = 'RSA-SHA256';
+        logger.info('Using RSA-SHA256 signing');
+      } catch (rsaError) {
+        logger.warn('RSA signing failed, trying ed25519', { error: rsaError.message });
+        
+        try {
+          // Try ed25519
+          signature = crypto.sign(null, Buffer.from(signingString), this.privateKey).toString('base64');
+          algorithm = 'ed25519';
+          logger.info('Using ed25519 signing');
+        } catch (ed25519Error) {
+          logger.error('Both signing methods failed', { 
+            rsaError: rsaError.message, 
+            ed25519Error: ed25519Error.message 
+          });
+          throw new Error('Unable to sign request. Please check your ONDC_SIGNING_PRIVATE_KEY format.');
+        }
+      }
       
       return {
         signature: signature,
-        created: Math.floor(Date.now() / 1000).toString(),
-        expires: Math.floor(Date.now() / 1000 + 3600).toString(),
-        keyId: `${this.subscriberId}|${this.uniqueKeyId}|ed25519`,
-        algorithm: 'ed25519'
+        created: created.toString(),
+        expires: expires.toString(),
+        keyId: `${this.subscriberId}|${this.uniqueKeyId}|${algorithm}`,
+        algorithm: algorithm
       };
     } catch (error) {
       logger.error('Error generating auth signature:', error);
@@ -61,8 +112,10 @@ class ONDCService {
   }
 
   createSigningString(requestBody) {
-    const digest = crypto.createHash('sha256').update(JSON.stringify(requestBody)).digest('base64');
-    return `(created): ${Math.floor(Date.now() / 1000)}\n(expires): ${Math.floor(Date.now() / 1000 + 3600)}\ndigest: BLAKE-512=${digest}`;
+    const digest = crypto.createHash('BLAKE2b512').update(JSON.stringify(requestBody)).digest('base64');
+    const created = Math.floor(Date.now() / 1000);
+    const expires = created + 3600;
+    return `(created): ${created}\n(expires): ${expires}\ndigest: BLAKE-512=${digest}`;
   }
 
   // Create Authorization header for ONDC requests
