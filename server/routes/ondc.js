@@ -21,6 +21,16 @@ const searchSchema = Joi.object({
 // Search for products
 router.post('/search', async (req, res) => {
   try {
+    // Check if ONDC is properly configured
+    if (!process.env.ONDC_SIGNING_PRIVATE_KEY || 
+        process.env.ONDC_SIGNING_PRIVATE_KEY.startsWith('test_')) {
+      return res.status(503).json({ 
+        error: 'ONDC service not configured',
+        message: 'Product search via ONDC is not available yet. Please configure ONDC_SIGNING_PRIVATE_KEY in Vercel Dashboard.',
+        documentation: 'See GENERATE_ONDC_KEYS.md for setup instructions'
+      });
+    }
+
     const { error } = searchSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
@@ -40,7 +50,10 @@ router.post('/search', async (req, res) => {
     });
   } catch (error) {
     logger.error('Search error:', error);
-    res.status(500).json({ error: 'Search request failed' });
+    res.status(500).json({ 
+      error: 'Search request failed',
+      hint: 'If you see key-related errors, follow GENERATE_ONDC_KEYS.md to set up proper ONDC keys'
+    });
   }
 });
 
