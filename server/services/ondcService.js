@@ -101,9 +101,10 @@ class ONDCService {
         // ONDC supports multiple algorithms including RSA-SHA256
         if (keyType === 'rsa' || keyType === 'rsa-pss') {
           algorithm = 'RSA-SHA256';
-      const sign = crypto.createSign('SHA256');
-      sign.update(signingString);
-      sign.end();
+          // IMPORTANT: Use SHA512 for signing when using BLAKE2b512 digest
+          const sign = crypto.createSign('SHA512');
+          sign.update(signingString);
+          sign.end();
           signature = sign.sign(privateKey, 'base64');
           
           logger.info('RSA signing successful', { 
