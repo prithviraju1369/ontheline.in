@@ -65,9 +65,9 @@ class ONDCService {
       const created = Math.floor(Date.now() / 1000);
       const expires = created + 3600; // 1 hour
       
-      // Create digest using SHA-256
-      const digest = crypto.createHash('sha256').update(JSON.stringify(requestBody)).digest('base64');
-      const signingString = `(created): ${created}\n(expires): ${expires}\ndigest: SHA-256=${digest}`;
+      // Create digest using BLAKE2b512 as per ONDC specification
+      const digest = crypto.createHash('blake2b512').update(JSON.stringify(requestBody)).digest('base64');
+      const signingString = `(created): ${created}\n(expires): ${expires}\ndigest: BLAKE-512=${digest}`;
       
       logger.info('Signing string created', { created, expires, digestLength: digest.length });
 
@@ -101,9 +101,9 @@ class ONDCService {
         // ONDC supports multiple algorithms including RSA-SHA256
         if (keyType === 'rsa' || keyType === 'rsa-pss') {
           algorithm = 'RSA-SHA256';
-          const sign = crypto.createSign('SHA256');
-          sign.update(signingString);
-          sign.end();
+      const sign = crypto.createSign('SHA256');
+      sign.update(signingString);
+      sign.end();
           signature = sign.sign(privateKey, 'base64');
           
           logger.info('RSA signing successful', { 
@@ -141,10 +141,10 @@ class ONDCService {
   }
 
   createSigningString(requestBody) {
-    const digest = crypto.createHash('sha256').update(JSON.stringify(requestBody)).digest('base64');
+    const digest = crypto.createHash('blake2b512').update(JSON.stringify(requestBody)).digest('base64');
     const created = Math.floor(Date.now() / 1000);
     const expires = created + 3600;
-    return `(created): ${created}\n(expires): ${expires}\ndigest: SHA-256=${digest}`;
+    return `(created): ${created}\n(expires): ${expires}\ndigest: BLAKE-512=${digest}`;
   }
 
   // Create Authorization header for ONDC requests
